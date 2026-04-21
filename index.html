@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>DELTA RSL SYSTEM</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --cyan: #00f2ff; --bg: #050505; }
+        body { background: var(--bg); color: #fff; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; min-height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; }
+        .neon-input { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; width: 100%; color: #fff; outline: none; transition: 0.3s; }
+        .neon-input:focus { border-color: var(--cyan); }
+        .btn-main { background: var(--cyan); color: #000; font-weight: 800; border-radius: 12px; transition: 0.3s; text-transform: uppercase; }
+        .btn-main:active { transform: scale(0.96); }
+        .scroll-v { max-height: 250px; overflow-y: auto; scrollbar-width: none; }
+        table { width: 100%; font-size: 11px; border-collapse: collapse; }
+        td, th { padding: 12px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); text-align: left; }
+        select { background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); background-repeat: no-repeat; background-position: right 10px center; appearance: none; }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center justify-center min-h-screen">
+
+<div id="auth-ui" class="glass p-10 w-full max-w-[400px]">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-black italic">DELTA <span class="text-cyan-400">RSL</span></h1>
+        <p class="text-[9px] text-gray-500 uppercase mt-2 tracking-[0.3em]">Hệ Thống CTV</p>
+    </div>
+    <div class="space-y-4">
+        <select id="login-role" class="neon-input text-xs font-bold text-cyan-400">
+            <option value="userctv">CỔNG CTV</option>
+            <option value="admin">CỔNG ADMIN</option>
+        </select>
+        <input type="text" id="au" placeholder="Username" class="neon-input text-sm">
+        <input type="password" id="ap" placeholder="Password" class="neon-input text-sm">
+        <button onclick="login()" class="btn-main w-full py-4 text-xs">Xác Minh</button>
+    </div>
+</div>
+
+<div id="shop-ui" class="hidden w-full max-w-[600px] space-y-5 my-10">
+    <div id="adm-box" class="hidden space-y-5">
+        <div class="glass p-6 border border-cyan-400/20">
+            <h2 class="text-cyan-400 font-extrabold text-[10px] uppercase mb-4">QUẢN LÝ THÀNH VIÊN</h2>
+            <div class="scroll-v">
+                <table>
+                    <thead><tr class="text-gray-500 text-[9px]"><th>USER</th><th>VÍ</th><th>HÀNH ĐỘNG</th></tr></thead>
+                    <tbody id="user-list"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="glass p-6 border border-red-500/20">
+            <h2 class="text-red-500 font-extrabold text-[10px] uppercase mb-4">KHO KEY & GÓI</h2>
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <select id="adm-type-select" class="neon-input text-[11px]" onchange="renderAdminPackages()">
+                    <option value="ngay">Gói Ngày</option><option value="tuan">Gói Tuần</option><option value="thang">Gói Tháng</option><option value="nam">Gói Năm</option>
+                </select>
+                <button onclick="addPkgUI()" class="bg-white/10 py-2 rounded-lg text-[10px] font-bold">+ Tạo Gói</button>
+            </div>
+            <div id="adm-list" class="space-y-2 mb-4"></div>
+            <button onclick="savePkg()" class="btn-main w-full py-2 text-[10px] mb-4">Cập Nhật Gói</button>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <select id="n-type" class="neon-input text-[11px]" onchange="updateNSelect()"><option value="">Hạn Key</option><option value="ngay">Ngày</option><option value="tuan">Tuần</option><option value="thang">Tháng</option><option value="nam">Năm</option></select>
+                <select id="n-pkg" class="neon-input text-[11px]"><option value="">Chọn Gói</option></select>
+            </div>
+            <textarea id="add-k" placeholder="Dán key vào đây..." class="neon-input text-[11px] h-20 mb-2"></textarea>
+            <button onclick="napKey()" class="bg-white text-black font-bold w-full py-3 rounded-xl text-[10px]">NẠP KEY</button>
+        </div>
+    </div>
+
+    <div id="ctv-box" class="hidden space-y-5">
+        <div class="glass p-6 flex justify-between items-center">
+            <div><p class="text-[9px] text-gray-500 uppercase">CTV</p><p id="u-id" class="font-black text-cyan-400 text-xl">...</p></div>
+            <div class="text-right"><p class="text-[9px] text-gray-500 uppercase">Số dư</p><p id="u-bl" class="font-black text-yellow-400 text-xl">0đ</p></div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="glass p-6">
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase mb-4">MUA KEY</h3>
+                <select id="b-type" class="neon-input text-[11px] mb-2" onchange="updateBSelect()">
+                    <option value="ngay">Hạn: Ngày</option><option value="tuan">Hạn: Tuần</option><option value="thang">Hạn: Tháng</option><option value="nam">Hạn: Năm</option>
+                </select>
+                <select id="b-pkg" class="neon-input text-[11px] mb-4"><option value="">Chọn gói</option></select>
+                <button onclick="buyKey()" class="btn-main w-full py-4 text-xs italic">THANH TOÁN</button>
+            </div>
+            <div class="glass p-6 border border-yellow-400/20">
+                <h3 class="text-[10px] font-bold text-yellow-500 uppercase mb-4 text-center">NẠP TIỀN</h3>
+                <div class="space-y-3">
+                    <input type="number" id="nap-amount" placeholder="Nhập số tiền" class="neon-input text-sm">
+                    <button onclick="generateQR()" class="w-full btn-main py-3 text-[10px]">HIỆN MÃ QR</button>
+                </div>
+            </div>
+        </div>
+        <div class="glass p-6">
+            <p class="text-[9px] font-bold text-gray-500 uppercase mb-3">NHẬT KÝ</p>
+            <div class="scroll-v"><table><tbody id="h-list"></tbody></table></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const config = { databaseURL: "https://shopmduy-default-rtdb.asia-southeast1.firebasedatabase.app" };
+firebase.initializeApp(config);
+const db = firebase.database();
+const MY_BANK = { ID: "mbbank", STK: "0588807300000", NAME: "CAO MINH DUY" };
+let curU, curUID, sys = { pkgs: { ngay:{}, tuan:{}, thang:{}, nam:{} } };
+
+function login() {
+    const u = document.getElementById('au').value.trim().toLowerCase();
+    const p = document.getElementById('ap').value, r = document.getElementById('login-role').value;
+    db.ref('users/'+u).once('value', s => {
+        const d = s.val();
+        if(d && d.password === p && d.role === r) {
+            curU = u; curUID = d.uid;
+            document.body.classList.remove('justify-center');
+            document.getElementById('auth-ui').style.display='none';
+            document.getElementById('shop-ui').classList.remove('hidden');
+            if(r === 'admin') { document.getElementById('adm-box').classList.remove('hidden'); loadUserList(); }
+            else { 
+                document.getElementById('ctv-box').classList.remove('hidden');
+                document.getElementById('u-id').innerText = u.toUpperCase();
+                db.ref('users/'+u+'/balance').on('value', s => document.getElementById('u-bl').innerText = (s.val()||0).toLocaleString()+'đ');
+            }
+            init();
+        } else Swal.fire('Lỗi', 'Sai thông tin!', 'error');
+    });
+}
+
+function generateQR() {
+    const amount = document.getElementById('nap-amount').value;
+    const user = curU.toUpperCase();
+    if (!amount || amount < 10000) return Swal.fire('!', 'Nạp tối thiểu 10.000đ', 'error');
+    const desc = `NAP ${user}`;
+    const qrUrl = `https://img.vietqr.io/image/${MY_BANK.ID}-${MY_BANK.STK}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(desc)}&accountName=${encodeURIComponent(MY_BANK.NAME)}`;
+    Swal.fire({
+        background: '#050505', color: '#fff',
+        html: `<div class="p-2"><p class="text-cyan-400 font-black mb-4">QUÉT MÃ NẠP TIỀN</p><img src="${qrUrl}" class="w-64 h-64 mx-auto mb-4 border-2 border-cyan-400 rounded-xl"><div class="text-left bg-white/5 p-4 rounded-xl text-[11px]"><p><b>STK:</b> ${MY_BANK.STK}</p><p><b>CHỦ TK:</b> ${MY_BANK.NAME}</p><p><b>SỐ TIỀN:</b> ${Number(amount).toLocaleString()}đ</p><p class="text-cyan-400"><b>NỘI DUNG:</b> ${desc}</p></div></div>`,
+        confirmButtonText: 'ĐÃ CHUYỂN KHOẢN', confirmButtonColor: '#00f2ff'
+    });
+}
+
+function loadUserList() {
+    db.ref('users').on('value', s => {
+        const b = document.getElementById('user-list'); b.innerHTML = "";
+        s.forEach(u => {
+            const d = u.val();
+            if(d.role === 'userctv') {
+                b.innerHTML += `<tr><td class="text-xs font-bold">${u.key.toUpperCase()}</td><td class="text-yellow-400">${(d.balance||0).toLocaleString()}đ</td><td><button onclick="editBal('${u.key}',${d.balance||0})" class="bg-cyan-400/20 text-cyan-400 px-2 py-1 rounded text-[9px]">NẠP</button> <button onclick="delU('${u.key}')" class="bg-red-400/20 text-red-400 px-2 py-1 rounded text-[9px]">XÓA</button></td></tr>`;
+            }
+        });
+    });
+}
+
+function editBal(u, c) {
+    Swal.fire({ title:'Nạp '+u, input:'number', showCancelButton:true }).then(r => {
+        if(r.value) db.ref('users/'+u+'/balance').set(Number(c)+Number(r.value));
+    });
+}
+
+function delU(u) {
+    if(confirm('Xóa '+u+'?')) db.ref('users/'+u).remove();
+}
+
+function addPkgUI(data={name:'', qty:'', price:''}, id=null) {
+    const pkgId = id || 'pkg_' + Math.floor(Math.random() * 999999);
+    const div = document.createElement('div'); div.id = pkgId; div.className = "glass bg-white/[0.03] p-2 flex gap-2 mb-1 pkg-row";
+    div.innerHTML = `<input type="text" value="${data.name}" class="p-n neon-input text-[10px] p-2 flex-1"><input type="number" value="${data.qty}" class="p-q neon-input text-[10px] p-2 w-12"><input type="number" value="${data.price}" class="p-p neon-input text-[10px] p-2 w-20"><button onclick="this.parentElement.remove()" class="text-red-500 px-1">X</button>`;
+    document.getElementById('adm-list').appendChild(div);
+}
+
+function renderAdminPackages() {
+    const t = document.getElementById('adm-type-select').value, l = document.getElementById('adm-list'); l.innerHTML = "";
+    if(sys.pkgs && sys.pkgs[t]) {
+        Object.entries(sys.pkgs[t]).forEach(([id, p]) => addPkgUI(p, id));
+    }
+}
+
+function savePkg() {
+    const t = document.getElementById('adm-type-select').value, pkgs = {};
+    document.querySelectorAll('.pkg-row').forEach(d => {
+        const n = d.querySelector('.p-n').value, q = d.querySelector('.p-q').value, p = d.querySelector('.p-p').value;
+        if(n&&q&&p) pkgs[d.id] = {name:n, qty:Number(q), price:Number(p)};
+    });
+    db.ref('system/pkgs/'+t).set(pkgs).then(()=>Swal.fire('OK','Đã lưu','success'));
+}
+
+function updateNSelect() {
+    const t = document.getElementById('n-type').value, s = document.getElementById('n-pkg'); s.innerHTML = '<option value="">Chọn Gói</option>';
+    if(sys.pkgs && sys.pkgs[t]) Object.entries(sys.pkgs[t]).forEach(([id, p]) => s.innerHTML += `<option value="${id}">${p.name}</option>`);
+}
+
+function updateBSelect() {
+    const t = document.getElementById('b-type').value, s = document.getElementById('b-pkg'); 
+    const currentVal = s.value;
+    s.innerHTML = '<option value="">Chọn gói</option>';
+    if(sys.pkgs && sys.pkgs[t]) {
+        Object.entries(sys.pkgs[t]).forEach(([id, p]) => {
+            db.ref(`keys/${t}/${id}`).once('value', ks => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = `${p.name} (${p.price.toLocaleString()}đ) - Còn ${ks.numChildren()}`;
+                s.appendChild(opt);
+                if(id === currentVal) s.value = id;
+            });
+        });
+    }
+}
+
+function napKey() {
+    const t = document.getElementById('n-type').value, pid = document.getElementById('n-pkg').value, k = document.getElementById('add-k').value.split('\n').filter(x=>x.trim());
+    if(!t || !pid || !k.length) return Swal.fire('!','Thiếu tin','error');
+    const q = sys.pkgs[t][pid].qty;
+    if(k.length % q !== 0) return Swal.fire('!','SL nạp chia hết cho '+q,'warning');
+    for(let i=0; i<k.length/q; i++) db.ref(`keys/${t}/${pid}`).push(k.slice(i*q, (i+1)*q).join('|'));
+    document.getElementById('add-k').value=""; Swal.fire('OK','Đã nạp','success');
+}
+
+function buyKey() {
+    const t = document.getElementById('b-type').value, pid = document.getElementById('b-pkg').value;
+    if(!pid) return Swal.fire('!','Chọn gói','warning');
+    const p = sys.pkgs[t][pid];
+    db.ref('users/'+curU+'/balance').once('value', s => {
+        let b = s.val()||0; if(b < p.price) return Swal.fire('!','Hết tiền','error');
+        db.ref(`keys/${t}/${pid}`).limitToFirst(1).once('value', sk => {
+            if(!sk.exists()) return Swal.fire('!','Hết hàng','error');
+            db.ref('users/'+curU+'/balance').set(b - p.price);
+            let kID = Object.keys(sk.val())[0], kv = sk.val()[kID];
+            db.ref(`keys/${t}/${pid}/${kID}`).remove();
+            db.ref('history/'+curUID).push({ time: new Date().toLocaleString(), name: p.name, key: kv });
+            Swal.fire({ title:'XONG', html:`<textarea class="neon-input text-xs h-32 text-cyan-400">${kv.replace(/\|/g,'\n')}</textarea>`, confirmButtonText:'COPY' }).then(()=>navigator.clipboard.writeText(kv.replace(/\|/g,'\n')));
+        });
+    });
+}
+
+function init() {
+    db.ref('system/pkgs').on('value', s => { 
+        sys.pkgs = s.val() || { ngay:{}, tuan:{}, thang:{}, nam:{} }; 
+        updateBSelect(); 
+        updateNSelect();
+        if(document.getElementById('login-role').value === 'admin') renderAdminPackages();
+    });
+    if(curUID) {
+        db.ref('history/'+curUID).on('value', s => {
+            const b = document.getElementById('h-list'); b.innerHTML = "";
+            s.forEach(i => { const v = i.val(); b.innerHTML = `<tr><td>${v.time}</td><td>${v.name}</td><td class="text-cyan-400 font-mono">${v.key.substring(0,8)}...</td></tr>` + b.innerHTML; });
+        });
+    }
+}
+</script>
+</body>
+</html>
